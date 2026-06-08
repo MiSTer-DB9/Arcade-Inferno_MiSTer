@@ -233,8 +233,17 @@ wire  [15:0] joydb_1, joydb_2;
 wire         joydb_1ena, joydb_2ena;
 wire  [15:0] joy_raw_payload;
 
+// [MiSTer-DB9 BEGIN] - DB9 programmable-remap matrix wires
+// joydb_*_mapped = MiSTer-standard joystick words (consumed in Layer B);
+// db9_remap_* = 0xFD selector stream driven by the hps_io instance.
+wire  [15:0] joydb_1_mapped, joydb_2_mapped;
+wire         db9_remap_cmd;
+wire   [5:0] db9_remap_byte_cnt;
+wire  [15:0] db9_remap_din;
+// [MiSTer-DB9 END]
 joydb joydb (
   .clk             ( CLK_JOY         ),
+  .clk_sys         ( clk_sys            ),
   .USER_IN         ( USER_IN         ),
   .OSD_STATUS          ( OSD_STATUS          ),
   .snac_active         ( snac_active         ),
@@ -249,6 +258,11 @@ joydb joydb (
   .joydb_2         ( joydb_2         ),
   .joydb_1ena      ( joydb_1ena      ),
   .joydb_2ena      ( joydb_2ena      ),
+  .remap_cmd       ( db9_remap_cmd      ),
+  .remap_byte_cnt  ( db9_remap_byte_cnt ),
+  .remap_din       ( db9_remap_din      ),
+  .joydb_1_mapped  ( joydb_1_mapped     ),
+  .joydb_2_mapped  ( joydb_2_mapped     ),
   .joy_raw         ( joy_raw_payload )
 );
 // [MiSTer-DB9 END]
@@ -318,14 +332,14 @@ wire [ 15:0] joystick_r_analog_0, joystick_r_analog_1;
 // joydb raw word (Genesis/Saturn pad): [3:0]=UDLR [4]=B [5]=C [6]=A [7]=Start [8]=Mode [9]=X [10]=Y [11]=Z
 // Best-effort digital map for a fundamentally dual-49-way-stick game (NEEDS-HUMAN-REVIEW):
 //   Run stick   <- pad D-pad [3:0]
-//   Trigger     <- B   (joydb[4])
-//   Start       <- Start (joydb[7])
-//   Coin        <- Mode/Select (joydb[8])
-//   Aim Up      <- A   (joydb[6])
-//   Aim Down    <- C   (joydb[5])
-//   Aim Left    <- X   (joydb[9])  (6-button only)
-//   Aim Right   <- Y   (joydb[10]) (6-button only)
-//   Pause       <- Z   (joydb[11]) (6-button only)
+//   Trigger     <- B   (joydb_1[4])
+//   Start       <- Start (joydb_1[7])
+//   Coin        <- Mode/Select (joydb_1[8])
+//   Aim Up      <- A   (joydb_1[6])
+//   Aim Down    <- C   (joydb_1[5])
+//   Aim Left    <- X   (joydb_1[9])  (6-button only)
+//   Aim Right   <- Y   (joydb_1[10]) (6-button only)
+//   Pause       <- Z   (joydb_1[11]) (6-button only)
 wire [31:0] joystick_0 = joydb_1ena ? (OSD_STATUS ? 32'b0 : {joydb_1[11],joydb_1[10],joydb_1[9],joydb_1[5],joydb_1[6],joydb_1[8],joydb_1[7],joydb_1[4],joydb_1[3:0]}) : joystick_0_USB;
 wire [31:0] joystick_1 = joydb_2ena ? (OSD_STATUS ? 32'b0 : {joydb_2[11],joydb_2[10],joydb_2[9],joydb_2[5],joydb_2[6],joydb_2[8],joydb_2[7],joydb_2[4],joydb_2[3:0]}) : joydb_1ena ? joystick_0_USB : joystick_1_USB;
 // [MiSTer-DB9-Pro END]
@@ -361,6 +375,10 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.joystick_r_analog_1(joystick_r_analog_1),
 	// [MiSTer-DB9 BEGIN] - DB9/SNAC8 support: joy_raw
 	.joy_raw(OSD_STATUS ? joy_raw_payload : 16'b0),
+	// programmable remap matrix selector load (UIO_DB9_MAP 0xFD)
+	.db9_remap_cmd(db9_remap_cmd),
+	.db9_remap_byte_cnt(db9_remap_byte_cnt),
+	.db9_remap_din(db9_remap_din),
 	// [MiSTer-DB9 END]
 	// [MiSTer-DB9-Pro BEGIN] - Saturn key gate
 	.saturn_unlocked(saturn_unlocked)
